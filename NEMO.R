@@ -45,7 +45,7 @@ spectralClustering = SNFtool::spectralClustering
 
 NUM.NEIGHBORS.RATIO = 6
 
-nemo.affinity.graph <- function(raw.data, k=NA, alpha=0.5) {
+nemo.affinity.graph <- function(raw.data, k=NA) {
   # raw.data is a list of the data to be clustered, where each an entry is a matrix of features x samples.
   # It is assumed the colnames of these matrices are assigned, since these are used to match samples
   # from different omics.
@@ -60,7 +60,7 @@ nemo.affinity.graph <- function(raw.data, k=NA, alpha=0.5) {
     k = rep(k, length(raw.data))
   }
   sim.data = lapply(1:length(raw.data), function(i) {affinityMatrix(dist2(as.matrix(t(raw.data[[i]])),
-                                                                as.matrix(t(raw.data[[i]]))), k[i], alpha)})
+                                                                as.matrix(t(raw.data[[i]]))), k[i], 0.5)})
   affinity.per.omic = lapply(1:length(raw.data), function(i) {
     sim.datum = sim.data[[i]]
     non.sym.knn = apply(sim.datum, 1, function(sim.row) {
