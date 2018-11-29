@@ -26,16 +26,36 @@ load.nemo.results.libraries <- function() {
   library('mixtools')
 }
 
-create.robustness.results <- function() {
+get.full.data.results.dir <- function() {
+  return('path_to_results_on_full_data')
+}
+
+create.all.robustness.results <- function() {
+  robustness.results.dir = file.path(get.results.dir(), 'robustness')
+  neighbors.range = get.num.neighbors.sequence()
+  num.clusters.results.dir = file.path(get.results.dir(), 'robustness_num_clusters')
+  num.clusters.range = 2:15
+  
+  benchmark.ret = analyze.benchmark()
+  nemo.surv = benchmark.omics.surv(benchmark.ret)['nemo',]
+  nemo.clin = benchmark.omics.clinical(benchmark.ret)['nemo',]
+  nemo.num.clusters = benchmark.omics.num.clusters(benchmark.ret)['nemo',]
+  full.data.nemo.results = list(survival=nemo.surv, clinical=nemo.clin, num_clusters=nemo.num.clusters)
+  
+  create.robustness.results(robustness.results.dir, T, neighbors.range, full.data.nemo.results, 'number of neighbors', NULL)
+  create.robustness.results(num.clusters.results.dir, F, num.clusters.range, full.data.nemo.results, 'number of clusters', nemo.num.clusters)
+}
+
+create.robustness.results <- function(results.dir, is.neighbors, arg.sequence, full.data.results, x.title, nemo.params) {
   set.seed(42)
   
   robustness.results = list()
-  results.dir = file.path(get.results.dir(), 'robustness')
+  add.num.samples = is.null(nemo.params)
+
   for (i in 1:length(SUBTYPES.DATA)) {
     current.subtype.data = SUBTYPES.DATA[[i]]
     subtype.name = current.subtype.data$name
     subtype.display.name = current.subtype.data$display.name
-    
     
     pvalues = c()
     num.enriched = c()
@@ -46,24 +66,32 @@ create.robustness.results <- function() {
                                     only.primary = current.subtype.data$only.primary)
     subtype.raw.data = set.omics.list.attr(subtype.raw.data, 
                                            current.subtype.data)
+					   
+    if (add.num.samples) {
+      nemo.params = c(nemo.params, round(ncol(subtype.raw.data[[1]]) / NUM.NEIGHBORS.RATIO))
+    }
     
-    neighbors.range = get.num.neighbors.sequence()
-    for (num.neighbors in neighbors.range) {
-      cur.results.file.name = file.path(results.dir, paste(subtype.name, num.neighbors, sep='_'))
+    for (argum in arg.sequence) {
+      cur.results.file.name = file.path(results.dir, paste(subtype.name, argum, sep='_'))
       if (file.exists(cur.results.file.name)) {
         next
       }
-      clustering.ret = run.nemo(subtype.raw.data, subtype.name, num.neighbors = num.neighbors)
+      
+      if (is.neighbors) {
+        clustering.ret = run.nemo(subtype.raw.data, subtype.name, num.neighbors = argum)
+      } else {
+        clustering.ret = run.nemo(subtype.raw.data, subtype.name, num.clusters = argum)
+      }
+      
       clustering = clustering.ret$clustering
       save(clustering, file=cur.results.file.name)
     }
   }
   
-  neighbors.range = get.num.neighbors.sequence()
   # calculate survival and clinical enrichment
-  surv.robustness.results = matrix(0, nrow=length(SUBTYPES.DATA), ncol=length(neighbors.range))
-  clin.robustness.results = matrix(0, nrow=length(SUBTYPES.DATA), ncol=length(neighbors.range))
-  num.clusters.robustness.results = matrix(0, nrow=length(SUBTYPES.DATA), ncol=length(neighbors.range))
+  surv.robustness.results = matrix(0, nrow=length(SUBTYPES.DATA), ncol=length(arg.sequence))
+  clin.robustness.results = matrix(0, nrow=length(SUBTYPES.DATA), ncol=length(arg.sequence))
+  num.clusters.robustness.results = matrix(0, nrow=length(SUBTYPES.DATA), ncol=length(arg.sequence))
   
   for (i in 1:length(SUBTYPES.DATA)) {
     current.subtype.data = SUBTYPES.DATA[[i]]
@@ -80,9 +108,9 @@ create.robustness.results <- function() {
                                     only.primary = current.subtype.data$only.primary)
     
     
-    for (j in 1:length(neighbors.range)) {
-      num.neighbors = neighbors.range[j]
-      cur.results.file.name = file.path(results.dir, paste(subtype.name, num.neighbors, sep='_'))
+    for (j in 1:length(arg.sequence)) {
+      argum = arg.sequence[j]
+      cur.results.file.name = file.path(results.dir, paste(subtype.name, argum, sep='_'))
       load(cur.results.file.name)
 
       clin.file.path = paste(cur.results.file.name, 'clin', sep='_')
@@ -110,9 +138,9 @@ create.robustness.results <- function() {
   robustness.results = list(surv.robustness.results=surv.robustness.results, clin.robustness.results=clin.robustness.results, 
                             num.clusters.robustness.results=num.clusters.robustness.results)
   print(robustness.results)
-  plot.robustness.results(surv.robustness.results, -log10(0.05), 0.5, '-log10(logrank p-value)', 'survival_robustness.png')
-  plot.robustness.results(clin.robustness.results, 1, 1, '# enriched clinical parameters', 'clinical_robustness.png')
-  plot.robustness.results(num.clusters.robustness.results, 1, 1, 'number of clusters', 'num_clusters_robustness.png')
+  plot.robustness.results(surv.robustness.results, -log10(0.05), 0.5, '-log10(logrank p-value)', file.path(results.dir, 'survival_robustness.png'), arg.sequence, x.title, list(params=nemo.params, values=full.data.results$survival))
+  plot.robustness.results(clin.robustness.results, 1, 1, '# enriched clinical parameters', file.path(results.dir, 'clinical_robustness.png'), arg.sequence, x.title, list(params=nemo.params, values=full.data.results$clinical))
+  plot.robustness.results(num.clusters.robustness.results, 1, 1, 'number of clusters', file.path(results.dir, 'num_clusters_robustness.png'), arg.sequence, x.title, list(params=nemo.params, values=full.data.results$num_clusters))
 }
 
 analyze.all.missing.real.data <- function() {
@@ -135,7 +163,6 @@ analyze.all.missing.real.data <- function() {
     all.subtypes.results[[i]] = analyze.missing.real.data(subtype, subtype, missing.probs, num.iters, subtype.raw.data[1:2])
     all.subtypes.with.third.results[[i]] = analyze.missing.real.data(subtype.with.third, subtype, missing.probs, num.iters, subtype.raw.data)
   }
-  browser()
   plot.all.missing.real.data(all.subtypes.results, 'two_omics')
   plot.all.missing.real.data(all.subtypes.with.third.results, 'three_omics')
   
@@ -672,24 +699,41 @@ pvc.script.path <- function() {
 ####### Plots code #######
 ##########################
 
-plot.robustness.results <- function(robustness.results, y.max, ticks.breaks, y.lab, plot.name) {
-  plot.path = file.path(get.results.dir(), 'robustness')
-  png(file.path(plot.path, plot.name), width=1500, height=750)
+plot.robustness.results <- function(robustness.results, y.max, ticks.breaks, y.lab, plot.name, argum.range, x.title, full.data.results) {
+  png(plot.name, width=1500, height=750)
   
   subtype.plots = list()
   plot.titles = sapply(1:length(SUBTYPES.DATA), function(i) SUBTYPES.DATA[[i]]$display.name)
   for (i in 1:length(SUBTYPES.DATA)) {
   
+    param = full.data.results$params[i]
+    param.value = full.data.results$values[i]
     current.subtype.nemo.values = robustness.results[i,]
-    results.df = data.frame(range=get.num.neighbors.sequence(), 
-                            nemo.values = (current.subtype.nemo.values))
+    
+    # insert in an ordered manner
+    if (!(param %in% argum.range)) {
+      index.to.insert = max(which(argum.range<param))
+      cur.argum.range = append(argum.range, param, index.to.insert)
+      current.subtype.nemo.values = append(current.subtype.nemo.values, param.value, index.to.insert)
+    } else {
+      cur.argum.range = argum.range
+    }
+    
+    
+    results.df = data.frame(xrange=cur.argum.range, 
+                            nemo.values = current.subtype.nemo.values)
+    size.vector = results.df$xrange == param
 
    ylim.max = ceiling(max(results.df$nemo.values, y.max))
     print(ticks.breaks)
+    
     if (i == 1) {
-      subtype.plot = (ggplot(data=results.df, aes(x=range)) + 
-                        labs(title=plot.titles[[i]], x='number of neighbors', y=y.lab) + 
+      
+      subtype.plot = (ggplot(data=results.df, aes(x=xrange)) + 
+                        labs(title=plot.titles[[i]], x=x.title, y=y.lab) + 
                         geom_line(aes(y=nemo.values, color='red'), size=1) +
+			#geom_point(data=results.df[which(cur.argum.range == param),], aes(y=force(param.value), size=1.5)) + 
+			#geom_point(aes(x=xrange, y=nemo.values, size=ifelse(size.vector, 1.5, 0))) + 
                         scale_y_continuous(breaks=seq(0, ylim.max, by=ticks.breaks), limits=c(0, ylim.max)) +
                         theme(aspect.ratio = 1/1, plot.title = element_text(size=14),
                               
@@ -710,9 +754,11 @@ plot.robustness.results <- function(robustness.results, y.max, ticks.breaks, y.l
                               legend.position="none"
                         ))
     } else {
-      subtype.plot = (ggplot(data=results.df, aes(x=range)) + 
+      subtype.plot = (ggplot(data=results.df, aes(x=xrange)) + 
                         labs(title=plot.titles[[i]], x='', y='') + 
                         geom_line(aes(y=nemo.values, color='red'), size=1) +
+			#geom_point(data=results.df[which(cur.argum.range == param),], aes(y=param.value, size=1.5)) + 
+			#geom_point(aes(x=xrange, y=nemo.values, size=ifelse(size.vector, 1.5, 0))) + 
                         scale_y_continuous(breaks=seq(0, ylim.max, by=ticks.breaks), limits=c(0, ylim.max)) +
                         theme(legend.position="none", aspect.ratio = 1/1, plot.title = element_text(size=14),
                               panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
@@ -836,42 +882,6 @@ plot.missing.real.data.results <- function(all.partial.results) {
   dev.off()
 }
 
-
-temp.remove.analyze.subtype.mean = function(real.data.results) {
-    result.colors = c('black', 'brown', 'blue', 'purple', 'red', 'forestgreen')
-    nemo.ret = rep(0, 5)
-    mkl.ret = rep(0, 5)
-    cca.ret = rep(0, 5)
-    cca2.ret = rep(0, 5)
-    nemo_after.ret = rep(0, 5)
-    pvc.ret = rep(0, 5)
-  for (i in 1:10) {
-    cur.data.results = real.data.results[[i]]
-    nemo.ret = nemo.ret  + colMeans(-log10(cur.data.results[['nemo']]$surv.mat), na.rm=T)
-    mkl.ret = mkl.ret  + colMeans(-log10(cur.data.results[['mkl']]$surv.mat), na.rm=T)
-    cca.ret = cca.ret  + colMeans(-log10(cur.data.results[['cca']]$surv.mat), na.rm=T)
-    cca2.ret = cca2.ret  + colMeans(-log10(cur.data.results[['cca2']]$surv.mat), na.rm=T)
-    nemo_after.ret = nemo_after.ret  + colMeans(-log10(cur.data.results[['nemo_after']]$surv.mat), na.rm=T)
-    pvc.ret = pvc.ret  + colMeans(-log10(cur.data.results[['pvc']]$surv.mat), na.rm=T)
-    
-    #nemo.ret = nemo.ret  + colMeans((cur.data.results[['nemo']]$clin.mat), na.rm=T)
-    #mkl.ret = mkl.ret  + colMeans((cur.data.results[['mkl']]$clin.mat), na.rm=T)
-    #cca.ret = cca.ret  + colMeans((cur.data.results[['cca']]$clin.mat), na.rm=T)
-    #cca2.ret = cca2.ret  + colMeans((cur.data.results[['cca2']]$clin.mat), na.rm=T)
-    #nemo_after.ret = nemo_after.ret  + colMeans((cur.data.results[['nemo_after']]$clin.mat), na.rm=T)
-    #pvc.ret = pvc.ret  + colMeans((cur.data.results[['pvc']]$clin.mat), na.rm=T)
-  }
-    my.cols = c('black', 'red', 'blue', 'green', 'purple', 'yellow')
-    ymax = max(nemo.ret, mkl.ret, cca.ret, cca2.ret, nemo_after.ret, pvc.ret, na.rm=T)
-    plot(nemo.ret, type='l', col=my.cols[1], ylim=c(0, ymax), main='aggregate')
-    
-    lines(mkl.ret, type='l', col=result.colors[2])
-    lines(cca.ret, type='l', col=result.colors[3])
-    lines(cca2.ret, type='l', col=result.colors[4])
-    lines(nemo_after.ret, type='l', col=result.colors[5])
-    lines(pvc.ret, type='l', col=result.colors[6])
-}
-
 plot.partial.results <- function(simulation.results, x.values, ylabel, y.min=0, main='', include.labels=T) {
   result.colors = c('black', 'brown', 'blue', 'purple', 'red', 'forestgreen')
   lines.styles = c(1, 1, 2, 2, 3, 3)
@@ -901,4 +911,45 @@ plot.partial.results <- function(simulation.results, x.values, ylabel, y.min=0, 
 
   #legend(0.05, 0.3, legend=c('NEMO without imputation', 'NEMO with imputation', 'MCCA using first omic representation', 'MCCA using second omic representation', 'rMKL-LPP', 'PVC'),
   #            col=result.colors, box.lty=0, lty=lines.styles, lwd=2, cex=1.1, horiz=T)
+}
+
+run.handwritten.data <- function() {
+  set.seed(42)
+  handwritten.data.and.labs = get.handwritten()
+  handwritten.data = handwritten.data.and.labs[[1]]
+  handwritten.labels = handwritten.data.and.labs[[2]]
+  handwritten.name = 'handwritten'
+  
+  all.sel.samples = c()
+  all.sel.samples = sample(1:2000, 500)
+  handwritten.labels = handwritten.labels[all.sel.samples]
+  handwritten.data = lapply(handwritten.data, function(x) x[,all.sel.samples])
+  
+  attr(handwritten.data[[1]], 'is.seq') = F
+  attr(handwritten.data[[2]], 'is.seq') = F
+  
+  num.iters = 10
+  missing.probs = c(0, 0.5)
+  set.seed(42)
+  run.partial.analysis(handwritten.name, handwritten.data, missing.probs, num.iters, num.clusters=10, impute.transpose=F)
+  
+  # and now analyze the results
+  handwritten.analysis = analyze.missing.simulation.data(handwritten.name, missing.probs, num.iters, handwritten.labels)
+  print(handwritten.analysis)
+  return(handwritten.analysis)
+}
+
+get.handwritten <- function() {
+  file1 = file.path("path_to_pixel_omic")
+  file2 = file.path("path_to_fourier_omic")
+  all.data = lapply(c(file1, file2), function(fpath) {
+    data.mat = read.table(fpath)
+    rownames(data.mat) = paste0('web', 1:nrow(data.mat))
+    colnames(data.mat) = paste0('feat', 1:ncol(data.mat))
+    ret = as.data.frame(t(data.mat))
+    attr(ret, 'is.seq') = F
+    return(ret)
+  })
+  labs = unlist(lapply(1:10, function(x) rep(x, 200)))
+  return(list(all.data, labs))
 }
