@@ -1,6 +1,11 @@
 # NEMO
 This repository includes an implementation of the NEMO (NEighborhood based Multi-Omics clustering) multi-omics clustering algorithm.
-The implementation of the method is in NEMO.R. The other files include code to reproduce all NEMO results in the paper. 
+The NEMO package is included in the NEMO directory. The other files, in the top directory, include code to reproduce all NEMO results in the paper. 
+NEMO can be installed as follows:
+```{r}
+devtools::install_github('Shamir-Lab/NEMO/NEMO')
+```
+
 
 Basic use of NEMO is as follows:
 
