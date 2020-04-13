@@ -12,6 +12,7 @@ Basic use of NEMO is as follows:
 ```{r}
 # omics.list is a list of data frames, where in each data frame columns are samples and rows are features.
 # note that colnames for each data frame should be set.
+# Two toy datasets, omic1 and omic2, are also loaded whenever NEMO is loaded, but here we read them from a file.
 omic1 = read.table(file='data/sample_omic1')
 omic2 = read.table(file='data/sample_omic2')
 omics.list = list(omic1, omic2)
