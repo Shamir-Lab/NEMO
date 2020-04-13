@@ -5,7 +5,10 @@ NEMO can be installed as follows:
 ```{r}
 devtools::install_github('Shamir-Lab/NEMO/NEMO')
 ```
-
+Or just download the files and run:
+```{r}
+source('NEMO.R')
+```
 
 Basic use of NEMO is as follows:
 
