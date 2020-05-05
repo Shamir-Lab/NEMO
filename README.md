@@ -29,14 +29,14 @@ A more advanced use is as follows:
 ```{r}
 # k can also be set to NA, in which case nemo chooses its value.
 # nemo.affinity.graph is the integrated affinity graph.
-nemo.affinity.graph = nemo.affinity.graph(omics.list, k = 20)
+affinity.graph = nemo.affinity.graph(omics.list, k = 20)
 
 # ask nemo to estimate the number of clusters.
-num.clusters = nemo.num.clusters(nemo.affinity.graph)
+num.clusters = nemo.num.clusters(affinity.graph)
 
-# clustering is the cluster assignment vector, ordered by the columns of nemo.affinity.graph.
-clustering = spectralClustering(nemo.affinity.graph, num.clusters)
-names(clustering) = colnames(nemo.affinity.graph)
+# clustering is the cluster assignment vector, ordered by the columns of affinity.graph.
+clustering = spectralClustering(affinity.graph, num.clusters)
+names(clustering) = colnames(affinity.graph)
 ```
 
 NEMO requires prior installation of the R library SNFtool, and also uses some of its code:
